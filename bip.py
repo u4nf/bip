@@ -1,19 +1,19 @@
-#!/usr/bin/env python3
+#! /home/u4nf/dev/bip/bin/python3
 
 import requests, re
 from prettytable import PrettyTable
 
 money = 100
-tick = 'BTC'
+tick = 'USDT'
 
 url = 'https://api.kucoin.com/api/v1/market/allTickers'
 data = requests.get(url).json()['data']['ticker']
+fee = 0.001
 
-tableOut = PrettyTable()
-tableOut.field_names = ['TICKER', 'QTY']
-tableOut.align['QTY'] = 'l'
 
 prospects = {}
+paths = []
+
 
 def getPrimaryList(tick):
 	#returns list of pairs that have multiple markets (not "SHITCOIN-USDT"), ensure arb is possible
@@ -41,29 +41,79 @@ def getPrimaryList(tick):
 			if counter > 2:
 				markets[base] = temp
 				l1.append(i)
-			
-	print('************************************************************************************************************************************')
-	print(markets)
-	print('************************************************************************************************************************************')
 
-	return l1
+	return l1, markets
 
 
-def getSecondaryList(l1):
+def getAllPaths(markets):
 
-	#print(l1)
-	for i in l1:
-		index = re.search('-', i['symbol']).start()
-		ticker = i['symbol'][:(index)]
-		if float(i['buy']) > 0:
-			qty = money / (float(i['buy']))
-		prospects [ticker] = qty
+	#iterate over each ticker and construct a path to BTC then USDT
+	for i in markets:
 
-l1 = getPrimaryList(tick)
+		#iterate over pairs associated with ticker
+		for j in markets[i]:
 
-getSecondaryList(l1)
+			#check for BTC pair
+			if i + '-BTC' in markets[i]:
+				
+				#create temp object containing path
+				tempPath = {i:{}}
 
+				#simulate initial trade from USDT to Token
+				fromUSDT = money / float(markets[i][i + '-USDT']['buy'])
+				#deduct trading fee
+				fromUSDT -= fromUSDT * fee
+				tempPath[i]['fromUSDT'] = fromUSDT
+
+				#simulate trade from token to BTC
+				toBTC = fromUSDT * float(markets[i][i + '-BTC']['buy'])
+				#deduct trading fee
+				toBTC -= toBTC * fee
+				tempPath[i]['toBTC'] = toBTC
+
+				#simulate trade from BTC to USDT
+				toUSDT = toBTC * float(markets['BTC']['BTC-USDT']['buy'])
+				#deduct trading fee
+				toUSDT -= toUSDT * fee
+				tempPath[i]['toUSDT'] = toUSDT
+
+				#add to path
+				paths.append(tempPath)
+
+				break
+
+		
+def createTable():
+
+	tableOut = PrettyTable()
+	tableOut.field_names = ['TICKER', 'From USDT', 'To  BTC', 'To USDT']
+	tableOut.align['From USDT'] = 'l'
+	tableOut.align['To  BTC'] = 'l'
+	tableOut.align['To USDT'] = 'l'
+
+	for i in paths:
+		print(i)
+		for tempTicker in i.keys():
+			ticker = tempTicker 
+
+		tableOut.add_row([ticker, i[ticker]['fromUSDT'], i[ticker]['toBTC'], i[ticker]['toUSDT']])
+
+	print(tableOut)
+
+
+l1, markets = getPrimaryList(tick)
+
+getAllPaths(markets)
+createTable()
+
+
+
+
+
+
+"""
+#create table
 for i in prospects:
 	tableOut.add_row([i, prospects[i]])
 print(tableOut)
-
+"""
