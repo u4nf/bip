@@ -47,56 +47,88 @@ def getPrimaryList(tick):
 
 def getAllPaths(markets):
 
+	def getPath(token, second):
+		#returns an object simulating a path USDT > xxx > xxx > USDT
+
+		#create temp object containing path
+		tempPath = {}
+
+		#simulate initial trade from USDT to Token
+		fromUSDT = money / float(markets[token][token + '-USDT']['buy'])
+		#deduct trading fee
+		fromUSDT -= fromUSDT * fee
+		tempPath['fromUSDT'] = fromUSDT
+
+		#simulate trade from token to "second"
+		toSecond = fromUSDT * float(markets[token][token + '-' + second]['buy'])
+		#deduct trading fee
+		toSecond -= toSecond * fee
+		tempPath['toSecond'] = toSecond
+
+		#simulate trade from "second" back to USDT
+		toUSDT = toSecond * float(markets[second][second + '-USDT']['buy'])
+		#deduct trading fee
+		toUSDT -= toUSDT * fee
+		tempPath['toUSDT'] = toUSDT
+
+		return tempPath
+
+
 	#iterate over each ticker and construct a path to BTC then USDT
-	for i in markets:
+	#first = first trade from USDT
+	#second = following trade (BTC / ETH / KCS)
+	for token in markets:
+		tempHolder = {token: {}}
 
-		#iterate over pairs associated with ticker
-		for j in markets[i]:
+		
+		#skip USDT-USDC
+		if token in ['USDT', 'USDC']:
+			continue
+		
+	
+		if token + '-BTC' in markets[token]:
+			btc = getPath(token, 'BTC')
+			tempHolder[token]['BTC'] = btc
+		
+		if token + '-ETH' in markets[token]:
+			eth = getPath(token, 'ETH')
+			tempHolder[token]['ETH'] = eth
 
-			#check for BTC pair
-			if i + '-BTC' in markets[i]:
-				
-				#create temp object containing path
-				tempPath = {i:{}}
+		if token + '-KCS' in markets[token]:
+			kcs = getPath(token, 'KCS')
+			tempHolder[token]['KCS'] = kcs
 
-				#simulate initial trade from USDT to Token
-				fromUSDT = money / float(markets[i][i + '-USDT']['buy'])
-				#deduct trading fee
-				fromUSDT -= fromUSDT * fee
-				tempPath[i]['fromUSDT'] = fromUSDT
+		"""
+		if token + '-USDC' in markets[token]:
+			usdc = getPath(token, 'USDC')
+			tempHolder[token]['USDC'] = usdc
+		"""
 
-				#simulate trade from token to BTC
-				toBTC = fromUSDT * float(markets[i][i + '-BTC']['buy'])
-				#deduct trading fee
-				toBTC -= toBTC * fee
-				tempPath[i]['toBTC'] = toBTC
-
-				#simulate trade from BTC to USDT
-				toUSDT = toBTC * float(markets['BTC']['BTC-USDT']['buy'])
-				#deduct trading fee
-				toUSDT -= toUSDT * fee
-				tempPath[i]['toUSDT'] = toUSDT
-
-				#add to path
-				paths.append(tempPath)
-
-				break
+		#add all found paths to paths object
+		paths.append(tempHolder)
 
 		
 def createTable():
 
 	tableOut = PrettyTable()
-	tableOut.field_names = ['TICKER', 'From USDT', 'To  BTC', 'To USDT']
+	tableOut.field_names = ['TICKER', 'SECONDARY', 'From USDT', 'To  SECONDARY', 'To USDT']
 	tableOut.align['From USDT'] = 'l'
-	tableOut.align['To  BTC'] = 'l'
+	tableOut.align['To  SECONDARY'] = 'l'
 	tableOut.align['To USDT'] = 'l'
 
 	for i in paths:
-		print(i)
+		
+		#iterate over tokens
 		for tempTicker in i.keys():
-			ticker = tempTicker 
+			ticker = tempTicker
+			
+			#iterate over pairs in token
+			for secondToken in i[ticker]:
+				fromUSDT = i[ticker][secondToken]['fromUSDT']
+				tokenToSecond = i[ticker][secondToken]['toSecond']
+				toUSDT = i[ticker][secondToken]['toUSDT']
 
-		tableOut.add_row([ticker, i[ticker]['fromUSDT'], i[ticker]['toBTC'], i[ticker]['toUSDT']])
+				tableOut.add_row([ticker, secondToken, fromUSDT, tokenToSecond, toUSDT])
 
 	print(tableOut)
 
@@ -105,15 +137,3 @@ l1, markets = getPrimaryList(tick)
 
 getAllPaths(markets)
 createTable()
-
-
-
-
-
-
-"""
-#create table
-for i in prospects:
-	tableOut.add_row([i, prospects[i]])
-print(tableOut)
-"""
