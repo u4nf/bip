@@ -3,12 +3,34 @@
 import requests, re
 from prettytable import PrettyTable
 
-money = 100
+#user defined variables
+money = 100.00
 tick = 'USDT'
-
-url = 'https://api.kucoin.com/api/v1/market/allTickers'
-data = requests.get(url).json()['data']['ticker']
+#exchange fee
 fee = 0.001
+#0.1 is 10% profit per trade
+minProfitPercent = 0.001
+#API URL
+url = 'https://api.kucoin.com/api/v1/market/allTickers'
+
+
+
+def getInitailAPIData(url):
+	#gets and checks API data, returns json
+
+	data = requests.get(url)
+
+	#verify good response from API
+	if data.status_code != 200:
+		print('Bad response - status ' + str(data.status_code))
+		exit()
+
+	#format response
+	data = data.json()['data']['ticker']
+
+	return data
+
+
 
 
 prospects = {}
@@ -57,19 +79,19 @@ def getAllPaths(markets):
 		fromUSDT = money / float(markets[token][token + '-USDT']['buy'])
 		#deduct trading fee
 		fromUSDT -= fromUSDT * fee
-		tempPath['fromUSDT'] = fromUSDT
+		tempPath['fromUSDT'] = round(fromUSDT, 8)
 
 		#simulate trade from token to "second"
 		toSecond = fromUSDT * float(markets[token][token + '-' + second]['buy'])
 		#deduct trading fee
 		toSecond -= toSecond * fee
-		tempPath['toSecond'] = toSecond
+		tempPath['toSecond'] = round(toSecond, 8)
 
 		#simulate trade from "second" back to USDT
 		toUSDT = toSecond * float(markets[second][second + '-USDT']['buy'])
 		#deduct trading fee
 		toUSDT -= toUSDT * fee
-		tempPath['toUSDT'] = toUSDT
+		tempPath['toUSDT'] = round(toUSDT, 4)
 
 		return tempPath
 
@@ -108,15 +130,50 @@ def getAllPaths(markets):
 		paths.append(tempHolder)
 
 		
-def createTable():
+def selectProfitable(paths, percent):
+	#returns a list of trades that are profitable
+	profitable = []
+
+	for i in paths:
+
+		#iterate over provided token paths
+		for tempTicker in i.keys():
+			ticker = tempTicker
+
+			#iterate over each secondary pair
+			for second in i[ticker]:
+				outputOfTrade = i[ticker][second]['toUSDT']
+				
+				#check to see if trade exceeds the profit threshold
+				profit = outputOfTrade - money
+		
+				if profit > (money * percent):
+					
+					#create object for list
+					profitablePath = {ticker: {second: i[ticker][second]}}
+
+					profitPercentage = round((profit / money) * 100, 4)
+					profitablePath[ticker][second]['percent'] = profitPercentage
+
+					profitable.append(profitablePath)
+					
+	return profitable
+
+
+def createTable(input):
 
 	tableOut = PrettyTable()
-	tableOut.field_names = ['TICKER', 'SECONDARY', 'From USDT', 'To  SECONDARY', 'To USDT']
+	tableOut.field_names = ['TICKER', 'SECONDARY', 'From USDT', 'To  SECONDARY', 'To USDT', '% Profit']
 	tableOut.align['From USDT'] = 'l'
 	tableOut.align['To  SECONDARY'] = 'l'
 	tableOut.align['To USDT'] = 'l'
+	tableOut.align['% Profit'] = 'l'
 
-	for i in paths:
+	#sort table
+	tableOut.sortby = "% Profit"
+	tableOut.reversesort = True
+
+	for i in input:
 		
 		#iterate over tokens
 		for tempTicker in i.keys():
@@ -127,13 +184,20 @@ def createTable():
 				fromUSDT = i[ticker][secondToken]['fromUSDT']
 				tokenToSecond = i[ticker][secondToken]['toSecond']
 				toUSDT = i[ticker][secondToken]['toUSDT']
+				percent = i[ticker][secondToken]['percent']
 
-				tableOut.add_row([ticker, secondToken, fromUSDT, tokenToSecond, toUSDT])
+				tableOut.add_row([ticker, secondToken, fromUSDT, tokenToSecond, toUSDT, percent])
 
-	print(tableOut)
+	return tableOut
 
+data = getInitailAPIData(url)
 
 l1, markets = getPrimaryList(tick)
 
 getAllPaths(markets)
-createTable()
+
+profitable = selectProfitable(paths, minProfitPercent)
+
+OutputTable = createTable(profitable)
+
+print(OutputTable)
