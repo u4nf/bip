@@ -10,7 +10,7 @@ money = 100.00
 fee = 0.001
 #0.1 is 10% profit per trade
 #minProfitPercent = 0.002
-minProfitPercent = 0.002
+minProfitPercent = 0.00
 #API URL
 url = 'https://api.kucoin.com/api/v1/market/allTickers'
 #orderbook API
@@ -21,17 +21,36 @@ pairsFile = "kuCoinPairs.txt"
 tick = 'USDT'
 #common pairs (save searching)
 commonPairsList = ['BTC-USDT', 'ETH-USDT', 'KCS-USDT']
+logFile = './log.txt'
 
 paths = []
 
-def log(dataToLog):
+def log(dataToLog, destination = 0):
 
-	#log details of currnet activity and outcome
+	#log details to console (destination = 0) or file (destination = 1)
+
+	timestamp = datetime.datetime.now().strftime("%Y-%b-%d - %H:%M:%S.%f")
+
+	#write to file
+	if destination == 1:
+		with open(logFile, 'a') as f:
+
+			#delimiter
+			if dataToLog == 1:
+				f.write('\n*******************************************************')
+				return
+
+			#log to console
+			f.write(f'\n{timestamp} --- {dataToLog}')
+		return	
+
+    #delimiter
 	if dataToLog == 1:
 		print('*******************************************************')
 		return
 	
-	print(f'{datetime.datetime.now()} --- {dataToLog}')
+	#log to console
+	print(f'{timestamp} --- {dataToLog}')
 
 
 def getAPIData(url):
@@ -157,9 +176,6 @@ def getTradeData(path, data):
 
 def surfaceProfitable(tradeData, percent, money):
 	#returns a list of trades that are profitable
-
-
-
 
 	#calculate token qty after trade 0
 	tradeData[0]['afterTradeQty'] = deductTradeFee(money / tradeData[0]['sell'], 8)
@@ -296,14 +312,18 @@ def isProfitable(input):
 
 	#If profitable at L1
 	if profitCalc['profitPercent'] > minProfitPercent:
-		log(f'Profitable trade -----  {profitCalc}')
+		log('PROFITABLE TRADE -----  LOGGED TO FILE')
+		log(1,1)
+		log(f"PROFITABLE TRADE %{profitCalc['profitPercent']}",1)
+		log(f"PAIRS   - {input['pairs']}", 1)
+		log(f'PROFIT  - {profitCalc}', 1)
+		log(f'DETAILS - {transactionBundle}', 1)
+
 		return(transactionBundle, profitCalc)
 	else:
+		log(transactionBundle)
+		log(profitCalc)
 		return f"Not Profitable -- %{profitCalc['profitPercent']}", -1
-
-
-
-
 
 
 
@@ -314,9 +334,10 @@ pathsList = getPathList()
 
 while True:
 	#get raw data
-	log('Getting API DATA')
+	log(1)
+	log('GETTING INITIAL API DATA')
 	data = getAPIData(url)
-	log('Got API DATA')
+	log('GOT INITIAL API DATA')
 
 	#get surface prices of BTC/ETH/KCS to minimise lookups
 	commonPairs = getCommonPairPrices(commonPairsList, data)
